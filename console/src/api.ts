@@ -1,5 +1,5 @@
 import type {
-  Health, Mandate, Scope, ThreadState, ThreadSummary,
+  Health, Mandate, Provider, RoutingRow, Scope, ThreadState, ThreadSummary,
 } from "./types";
 
 const BASE = "/api";
@@ -42,6 +42,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ granted, scope }),
     }),
+  settle: (id: string) =>
+    call<ThreadState>(`/sessions/${id}/settle`, { method: "POST" }),
+  setStatus: (id: string, status: string) =>
+    call<{ mandate_id: string; status: string }>(`/mandates/${id}/status`, {
+      method: "POST",
+      body: JSON.stringify({ status }),
+    }),
+  providers: () => call<Provider[]>("/providers"),
+  routingMatrix: () => call<RoutingRow[]>("/routing/matrix"),
   closeThread: (id: string) =>
     call<{ deleted: string }>(`/sessions/${id}`, { method: "DELETE" }),
   scan: (text: string) =>

@@ -26,7 +26,9 @@ from .models import (
     Approval, ApprovalScope, Commitment, EscalationRequest, Mandate, Offer,
 )
 from .negotiation import Orchestrator, PrincipalDesk
-from .providers import NoCompliantProviderError, TaskClass, default_router
+from .providers import (
+    NoCompliantProviderError, TaskClass, default_router, policy_router,
+)
 
 app = FastAPI(title="Warrant — delegated-authority agent platform", version="0.1.0")
 
@@ -41,6 +43,10 @@ LEDGER = Ledger()
 WALLETS = Wallets()
 ENGINE = AuthorisationEngine()
 ROUTER = default_router(offline=os.getenv("WARRANT_ONLINE") != "1")
+# Placement rules over the full configured roster, shown in the console. Real
+# calls go through ROUTER; this one exists so the policy can be inspected
+# without holding a credential for every vendor.
+POLICY = policy_router()
 
 MANDATES: dict[str, Mandate] = {
     m.mandate_id: m for m in (scenarios.buyer_mandate(), scenarios.seller_mandate())
@@ -49,6 +55,7 @@ TENANTS = {
     scenarios.BUYER_TENANT.tenant_id: scenarios.BUYER_TENANT,
     scenarios.SELLER_TENANT.tenant_id: scenarios.SELLER_TENANT,
     scenarios.STRICT_TENANT.tenant_id: scenarios.STRICT_TENANT,
+    scenarios.UNROUTABLE_TENANT.tenant_id: scenarios.UNROUTABLE_TENANT,
 }
 COMMITMENTS: dict[str, Commitment] = {}
 PENDING: dict[str, EscalationRequest] = {}
@@ -261,6 +268,14 @@ def create_session(req: CreateSession):
     bm, sm = MANDATES.get(req.buyer_mandate_id), MANDATES.get(req.seller_mandate_id)
     if not bm or not sm:
         raise HTTPException(404, "mandate not found")
+
+    unpublished = [m.principal for m in (bm, sm) if m.status != "published"]
+    if unpublished:
+        raise HTTPException(
+            409,
+            f"{' and '.join(unpublished)} has no published agent. An agent must be "
+            f"published before it can negotiate on someone's behalf.",
+        )
     thread_id = req.thread_id or f"THR-{uuid4().hex[:6].upper()}"
     if SESSIONS.get(thread_id):
         raise HTTPException(409, "a thread with that id already exists")
@@ -326,3 +341,77 @@ def delete_session(thread_id: str):
 @app.get("/tenants")
 def tenants():
     return [t.model_dump(mode="json") for t in TENANTS.values()]
+
+
+class StatusRequest(BaseModel):
+    status: str
+
+
+@app.post("/mandates/{mandate_id}/status")
+def set_status(mandate_id: str, req: StatusRequest):
+    """Publish, suspend, or return an agent to draft."""
+    m = MANDATES.get(mandate_id)
+    if not m:
+        raise HTTPException(404, "mandate not found")
+    if req.status not in ("draft", "published", "suspended"):
+        raise HTTPException(400, "status must be draft, published or suspended")
+    m.status = req.status  # type: ignore[assignment]
+    return {"mandate_id": mandate_id, "status": m.status}
+
+
+@app.post("/sessions/{thread_id}/settle")
+def settle_session(thread_id: str):
+    s = SESSIONS.get(thread_id)
+    if not s:
+        raise HTTPException(404, "thread not found")
+    try:
+        s.settle()
+    except SettlementError as e:
+        raise HTTPException(409, str(e))
+    return s.state()
+
+
+@app.get("/providers")
+def providers():
+    """
+    What the platform can route to, and where each provider can run.
+
+    Exposed because 'model-agnostic' is a claim, and a claim a reviewer cannot
+    inspect is worth very little.
+    """
+    return [
+        {"name": p.spec.name, "tier": p.spec.tier, "model": p.spec.model,
+         "regions": p.spec.regions, "available": p.spec.available,
+         "live_here": any(q.spec.name == p.spec.name for q in ROUTER.providers)}
+        for p in POLICY.providers
+    ]
+
+
+@app.get("/routing/matrix")
+def routing_matrix():
+    """Every tenant against every task class, with the reason for each outcome."""
+    from .providers import TaskClass
+
+    rows = []
+    for t in TENANTS.values():
+        for task in (TaskClass.NEGOTIATION, TaskClass.SUMMARY, TaskClass.CLASSIFY):
+            try:
+                p = POLICY.select(task, t)
+                rows.append({
+                    "tenant": t.display_name, "jurisdiction": t.jurisdiction.value,
+                    "task_class": task, "routed_to": p.spec.name, "tier": p.spec.tier,
+                    "refused": None,
+                })
+            except NoCompliantProviderError as e:
+                rows.append({
+                    "tenant": t.display_name, "jurisdiction": t.jurisdiction.value,
+                    "task_class": task, "routed_to": None, "tier": None,
+                    "refused": str(e),
+                })
+    return rows
+
+
+@app.get("/routing/decisions")
+def routing_decisions():
+    """Every routing choice actually made, for audit."""
+    return ROUTER.decisions[-100:]

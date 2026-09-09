@@ -164,7 +164,10 @@ The console opens in plain language. **Show technical detail** in the top right 
 4. **Nadia is asked next** — 17,800 is above the limit she set for booking without her. Approve, and the commitment forms.
 5. **Turn on Show technical detail**, then open the authority chain on any rule-check row. That list is the point of the whole product: every clause and human approval behind the deal. Turn it back off and the same screen reads like a business tool.
 6. **Record tab.** Every entry sealed against the one before it.
-7. **Safety tab.** Paste something hostile. It gets flagged into the record, and nothing about what the agent may do changes.
+7. **Settle this deal.** Balances move buyer → escrow → seller, and the settlement lands in the record.
+8. **Models tab.** Four providers, four customers, one table: permissive tenants get the capable model, the Saudi one is confined to the in-region model, and the Qatari one is refused outright.
+9. **Rules tab.** Suspend an agent, then try to start a deal — it is refused, with a reason.
+10. **Safety tab.** Paste something hostile. It gets flagged into the record, and nothing about what the agent may do changes.
 
 ### Verify the console the way you verify a block
 

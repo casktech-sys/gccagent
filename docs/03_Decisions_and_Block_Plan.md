@@ -34,6 +34,9 @@ Locked decisions. Not re-debated within a block. Changing one requires a new ADR
 | D-22 | The guide anchors to the control and presses it, except where the choice is the point | Describing a button is worse than pointing at it; pressing it for them is better still, unless pressing it is the decision | 2026-09-09 |
 | D-22a | Reading the walkthrough and acting on it are separate; Back and Next never act | Someone should be able to read all five steps without committing to anything, and never have a guide press a button they did not | 2026-09-09 |
 | D-23 | Warm paper theme, serif titles, hairline rules | Matches the register of a printed instrument of authority, and the rest of the portfolio | 2026-09-09 |
+| D-24 | Settlement runs only against a recorded commitment, and a settled thread cannot be replayed | Paying is downstream of being allowed to promise; money that has moved is not re-derived from rules | 2026-09-09 |
+| D-25 | Live routing and policy routing are separate routers | Placement rules must be inspectable and testable without holding a credential for every vendor | 2026-09-09 |
+| D-26 | An agent must be published before it can negotiate | A half-written mandate is exactly what should not be out there agreeing things | 2026-09-09 |
 
 ### Parked for counsel
 
@@ -92,6 +95,17 @@ Theme moved from slate to warm editorial paper: serif titles, hairline rules, on
 Single Render web service. Multi-stage Dockerfile: Node builds the console, the Python image serves both it and the API from one process. `warrant/serve.py` mounts the API under `/api` and the built console at `/`, with an SPA fallback so client-side routes survive a reload. Health check on `/healthz`, kept separate from `/api/health` so ledger state can never fail a deploy. Deployment runs the offline provider — no key, no model calls, no bill on a public link. Session store capped and evicting oldest.
 *Exit gate met:* production shape verified locally (root, deep link, static asset, `/api/*`, full negotiation to commitment); Dockerfile stages reproduced step by step and checked.
 *Remaining in B10:* screenshot in the README, and the repo made public.
+
+**B11 — Closing the visibility gap** ✓
+An audit against the six stated requirements found three capabilities fully built and fully invisible, and one only half built. A reviewer assessing on demonstrated work would have credited two of six.
+
+- **Token settlement** (was: built, unseen) — wallets now live on the thread. Buyer opens funded, settlement moves buyer → escrow → seller in balanced legs, escrow nets to zero, and the console shows balances before and after with the double-entry legs behind the detail switch. Settlement runs only against a commitment whose authority chain is already recorded: paying is downstream of being allowed to promise. A settled thread refuses further replay — money that has moved is not re-derived from rules.
+- **Model-agnostic routing and residency** (was: built, unseen) — split the live router from a **policy router**. The live one only offers providers it can actually call; the policy one evaluates the full configured roster regardless of credentials, which is what the console displays. This matters because with a single offline provider every tenant routed fine and the residency rule never fired — the strongest differentiator in the system was untestable in the demo. Roster now spans frontier, two cost-efficient vendors, and an in-region model, each region-limited.
+- **Agent lifecycle** (was: half built) — mandates carry draft / published / suspended. An unpublished agent cannot be put into a negotiation, refused at the API with a reason rather than silently.
+- **Unroutable tenant added** — a Qatari operator permitted only a region no provider serves, so "refuses rather than downgrading" is a behaviour a reviewer can see rather than a sentence in a document.
+- **Honest naming** — the offline provider was called `mock`, which reads as a placeholder. It is now `local-stub`, described as what it is: a deterministic in-region stand-in, pinned to `me-central` because that is the architectural role it plays.
+
+*Exit gate met:* 77 backend, 51 console; the routing matrix produces frontier for permissive tenants, in-region for Saudi, and refusal for Qatar, verified against the running service.
 
 ### Open
 

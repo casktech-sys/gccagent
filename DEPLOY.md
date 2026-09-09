@@ -23,7 +23,7 @@ than debugging inside a build log.
 ```bash
 cd ~/AIAgents/warrant
 source .venv/bin/activate
-python -m pytest -q                    # 60 passed
+python -m pytest -q                    # 77 passed
 
 cd console
 npm run typecheck                      # silent

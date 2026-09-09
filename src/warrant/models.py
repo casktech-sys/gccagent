@@ -85,6 +85,10 @@ class Mandate(BaseModel):
     principal: str
     role: Literal["buyer", "seller"]
     scope: str
+    # An agent is configured, then published, then possibly suspended. Only a
+    # published agent may be put into a negotiation — a half-written mandate is
+    # exactly the thing that should not be out there transacting.
+    status: Literal["draft", "published", "suspended"] = "published"
     who_you_are: str = ""                # one line identifying the principal
     subject: str = ""                    # what is being traded, for humans only
     unit: str = "units"                  # label for quantity, for humans only

@@ -33,6 +33,12 @@ export default function Mandates() {
     if (data && !draft) setDraft(structuredClone(data[0]));
   }, [data, draft]);
 
+  const setStatus = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      api.setStatus(id, status),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["mandates"] }),
+  });
+
   const save = useMutation({
     mutationFn: (m: Mandate) => api.saveMandate(m.mandate_id, m),
     onSuccess: () => {
@@ -68,6 +74,9 @@ export default function Mandates() {
                 <span className="block text-small text-ink">{m.principal}</span>
                 <span className="block text-micro text-muted">
                   {m.role === "buyer" ? "Buying" : "Selling"}
+                  {m.status !== "published" && (
+                    <span className="text-rust"> · {m.status}</span>
+                  )}
                 </span>
                 <Technical>
                   <span className="font-mono text-micro text-muted">
@@ -134,6 +143,42 @@ export default function Mandates() {
             </li>
           ))}
         </ul>
+
+        <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-rule pt-5">
+          <div>
+            <p className="text-small text-muted">
+              This agent is{" "}
+              <span className={draft.status === "published" ? "text-verdigris" : "text-rust"}>
+                {draft.status === "published" ? "live and able to negotiate"
+                  : draft.status === "suspended" ? "suspended and cannot negotiate"
+                    : "still a draft and cannot negotiate"}
+              </span>
+            </p>
+            <p className="mt-1 max-w-measure text-small text-muted">
+              An unfinished set of rules is exactly what should not be out there agreeing
+              things, so an agent has to be published before it can be put into a deal.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {draft.status !== "published" ? (
+              <button
+                className="btn-authority"
+                disabled={setStatus.isPending}
+                onClick={() => setStatus.mutate({ id: draft.mandate_id, status: "published" })}
+              >
+                Publish this agent
+              </button>
+            ) : (
+              <button
+                className="btn-decline"
+                disabled={setStatus.isPending}
+                onClick={() => setStatus.mutate({ id: draft.mandate_id, status: "suspended" })}
+              >
+                Suspend it
+              </button>
+            )}
+          </div>
+        </div>
 
         <div className="mt-6 flex items-center gap-3 border-t border-rule pt-5">
           <button

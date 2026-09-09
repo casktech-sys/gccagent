@@ -6,6 +6,7 @@ import { TourGuide, TourProvider, tourTarget, useTour } from "./tour";
 import Containment from "./routes/Containment";
 import Ledger from "./routes/Ledger";
 import Mandates from "./routes/Mandates";
+import Models from "./routes/Models";
 import Threads from "./routes/Threads";
 
 // Named for what a business owner would call them, not for what they are
@@ -13,6 +14,7 @@ import Threads from "./routes/Threads";
 const NAV = [
   { to: "/", label: "Deals", end: true },
   { to: "/mandates", label: "Rules" },
+  { to: "/models", label: "Models" },
   { to: "/ledger", label: "Record" },
   { to: "/containment", label: "Safety" },
 ];
@@ -90,6 +92,7 @@ function Shell() {
         <Routes>
           <Route path="/" element={<Threads />} />
           <Route path="/mandates" element={<Mandates />} />
+          <Route path="/models" element={<Models />} />
           <Route path="/ledger" element={<Ledger />} />
           <Route path="/containment" element={<Containment />} />
         </Routes>

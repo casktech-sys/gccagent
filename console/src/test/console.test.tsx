@@ -300,7 +300,8 @@ const thread = (over: Partial<ThreadState>): ThreadState => ({
   thread_id: "T", subject: "Road freight, Jebel Ali to Riyadh",
   status: "committed", replays: 1, buyer_mandate: "MND-BUY-001.v1",
   seller_mandate: "MND-SEL-001.v1", chain_valid: true, first_bad_seq: null,
-  trace: [], pending: null, decisions: [], commitment: null, ...over,
+  trace: [], pending: null, decisions: [], commitment: null, settlement: null,
+  wallets: { currency: "AED", balances: {}, opening_balance: 30000 }, ...over,
 });
 
 describe("guided walkthrough", () => {

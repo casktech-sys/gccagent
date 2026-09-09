@@ -45,6 +45,16 @@ STRICT_TENANT = Tenant(
     allow_cross_border_inference=False,
 )
 
+# A tenant whose regulator permits no region any provider serves. Included so
+# that "refuses rather than downgrading" is a behaviour a reviewer can see,
+# not a sentence in a document.
+UNROUTABLE_TENANT = Tenant(
+    tenant_id="tn_qa_operator", display_name="Doha operator (Qatar)",
+    jurisdiction=Jurisdiction.QA,
+    allowed_inference_regions=["qa-central"],
+    allow_cross_border_inference=False,
+)
+
 LANE = "Road freight, Jebel Ali to Riyadh"
 
 

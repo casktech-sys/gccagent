@@ -34,6 +34,11 @@ export default function Threads() {
     },
   });
 
+  const settle = useMutation({
+    mutationFn: () => api.settle(selected as string),
+    onSuccess: (st) => qc.setQueryData(["thread", st.thread_id], st),
+  });
+
   const decide = useMutation({
     mutationFn: ({ granted, scope }: { granted: boolean; scope: Scope }) =>
       api.decide(selected as string, granted, scope),
@@ -259,6 +264,81 @@ export default function Threads() {
                   ))}
                 </div>
                 </Technical>
+              </section>
+            )}
+
+            {state.commitment && (
+              <section className="mt-6 panel p-6">
+                <div className="flex flex-wrap items-baseline justify-between gap-3">
+                  <h2 className="font-display text-title">
+                    {state.settlement ? "Paid" : "Payment"}
+                  </h2>
+                  {!state.settlement && (
+                    <button
+                      className="btn-authority"
+                      onClick={() => settle.mutate()}
+                      disabled={settle.isPending}
+                    >
+                      {settle.isPending ? "Moving the money" : "Settle this deal"}
+                    </button>
+                  )}
+                </div>
+
+                {!state.settlement ? (
+                  <p className="mt-2 max-w-measure text-muted">
+                    Nothing has moved yet. Money can only move against a deal that is
+                    already agreed, so paying is downstream of being allowed to promise.
+                  </p>
+                ) : (
+                  <>
+                    <p className="mt-2 max-w-measure text-muted">
+                      {money(state.settlement.amount, state.settlement.currency)} went from{" "}
+                      {state.commitment.buyer_principal} to{" "}
+                      {state.commitment.seller_principal}, by way of an escrow account that
+                      is emptied in the same transaction.
+                    </p>
+
+                    <table className="mt-5 w-full max-w-lg border-collapse text-small">
+                      <thead>
+                        <tr className="border-b border-rule text-left text-micro text-muted">
+                          <th className="py-2 font-medium">Account</th>
+                          <th className="py-2 text-right font-medium">Before</th>
+                          <th className="py-2 text-right font-medium">After</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.keys(state.settlement.before).map((who) => (
+                          <tr key={who} className="border-b border-rule/60">
+                            <td className="py-2 text-ink">{who}</td>
+                            <td className="py-2 text-right figure text-muted">
+                              {money(state.settlement!.before[who], state.settlement!.currency)}
+                            </td>
+                            <td className="py-2 text-right figure text-ink">
+                              {money(state.settlement!.after[who], state.settlement!.currency)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    <Technical>
+                      <ul className="mt-4 space-y-1 font-mono text-micro text-muted">
+                        {state.settlement.legs.map((l, i) => (
+                          <li key={i}>
+                            debit {l.debit} · credit {l.credit} · {l.amount}
+                          </li>
+                        ))}
+                        {state.settlement.preconditions_met.map((c) => (
+                          <li key={c} className="text-verdigris">precondition met: {c}</li>
+                        ))}
+                      </ul>
+                    </Technical>
+                  </>
+                )}
+
+                {settle.isError && (
+                  <p className="mt-3 text-small text-rust">{(settle.error as Error).message}</p>
+                )}
               </section>
             )}
 

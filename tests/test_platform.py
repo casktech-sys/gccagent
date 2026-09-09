@@ -228,3 +228,59 @@ def test_thread_is_replayable_from_the_ledger_alone():
     replay = L.replay("T")
     assert any("COMMITMENT" in r for r in replay)
     assert any("BLOCKED" in r for r in replay)
+
+
+# -- agent lifecycle -------------------------------------------------------
+
+def test_mandates_are_published_by_default():
+    assert scenarios.buyer_mandate().status == "published"
+
+
+def test_a_draft_agent_is_not_ready_to_negotiate():
+    m = scenarios.buyer_mandate()
+    m.status = "draft"
+    assert m.status != "published"
+
+
+# -- routing policy over the full roster -----------------------------------
+
+from warrant.providers import policy_router  # noqa: E402
+
+
+def test_policy_router_holds_frontier_and_cost_efficient_vendors():
+    tiers = {p.spec.tier for p in policy_router().providers}
+    assert {"frontier", "cost_efficient", "local"} <= tiers
+
+
+def test_sensitive_work_goes_frontier_where_the_tenant_allows_it():
+    r = policy_router()
+    assert r.select(TaskClass.NEGOTIATION, scenarios.BUYER_TENANT).spec.tier == "frontier"
+
+
+def test_high_volume_work_goes_to_the_cheaper_tier():
+    r = policy_router()
+    assert r.select(TaskClass.CLASSIFY, scenarios.BUYER_TENANT).spec.tier == "cost_efficient"
+
+
+def test_strict_residency_forces_the_in_region_model():
+    """Saudi tenant forbids cross-border, so only the in-region option remains."""
+    r = policy_router()
+    chosen = r.select(TaskClass.NEGOTIATION, scenarios.STRICT_TENANT)
+    assert chosen.spec.tier == "local"
+    assert "me-central" in chosen.spec.regions
+
+
+def test_a_tenant_with_no_permitted_region_is_refused_outright():
+    r = policy_router()
+    with pytest.raises(NoCompliantProviderError):
+        r.select(TaskClass.NEGOTIATION, scenarios.UNROUTABLE_TENANT)
+
+
+def test_the_live_router_only_offers_what_it_can_call():
+    """Configured is not usable: no credential, no call."""
+    from warrant.providers import Router, configured_providers
+    live = Router(configured_providers(), require_available=True)
+    for p in live.providers:
+        if not p.spec.available:
+            assert p.spec.name != "local-stub"
+    assert live.select(TaskClass.NEGOTIATION, scenarios.STRICT_TENANT).spec.name == "local-stub"

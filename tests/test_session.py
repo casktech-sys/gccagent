@@ -150,3 +150,81 @@ def test_state_is_json_serialisable():
     s.decide(True, ApprovalScope.PRICE_ONLY)
     s.decide(True, ApprovalScope.FULL)
     json.dumps(s.state())
+
+
+# -- settlement (token transaction layer) ---------------------------------
+
+from warrant.ledger import SettlementError  # noqa: E402
+from warrant.session import OPENING_BALANCE  # noqa: E402
+
+
+def _closed():
+    s = _session().advance()
+    s.decide(True, ApprovalScope.PRICE_ONLY)
+    s.decide(True, ApprovalScope.FULL)
+    return s
+
+
+def test_buyer_opens_funded_and_seller_does_not():
+    s = _session()
+    assert s.wallets.balance("Nadia") == OPENING_BALANCE
+    assert s.wallets.balance("Omar") == 0
+
+
+def test_settlement_moves_the_agreed_amount():
+    s = _closed()
+    s.settle()
+    assert s.wallets.balance("Nadia") == OPENING_BALANCE - 17800
+    assert s.wallets.balance("Omar") == 17800
+
+
+def test_escrow_nets_to_zero():
+    s = _closed()
+    s.settle()
+    escrow = f"escrow::{s.commitment.commitment_id}"
+    assert abs(s.wallets.balance(escrow)) < 1e-9
+
+
+def test_settlement_is_recorded_in_the_ledger():
+    s = _closed()
+    s.settle()
+    kinds = [e.entry_type for e in s.ledger.entries("T")]
+    assert kinds[-1] == "settlement"
+    assert s.ledger.verify()[0]
+
+
+def test_cannot_settle_without_an_agreed_deal():
+    s = _session().advance()
+    with pytest.raises(SettlementError):
+        s.settle()
+
+
+def test_cannot_settle_twice():
+    s = _closed()
+    s.settle()
+    with pytest.raises(SettlementError):
+        s.settle()
+
+
+def test_a_settled_deal_cannot_be_renegotiated():
+    """Money that has moved is not re-derived from rules on the next replay."""
+    s = _closed()
+    s.settle()
+    with pytest.raises(SettlementError):
+        s.advance()
+
+
+def test_state_exposes_balances_before_and_after():
+    s = _closed()
+    s.settle()
+    st = s.state()
+    assert st["settlement"]["before"]["Nadia"] == OPENING_BALANCE
+    assert st["settlement"]["after"]["Omar"] == 17800
+    assert st["wallets"]["currency"] == "AED"
+
+
+def test_settlement_carries_its_preconditions():
+    s = _closed()
+    payload = s.settle()
+    assert "both_authority_chains_valid" in payload["preconditions_met"]
+    assert len(payload["legs"]) == 2

@@ -28,11 +28,14 @@ from typing import Optional
 
 from .agent import Agent
 from .engine import AuthorisationEngine
-from .ledger import Ledger
+from .ledger import Ledger, SettlementError, Wallets
 from .models import (
     Approval, ApprovalScope, ClauseKind, Commitment, EscalationRequest, Mandate,
 )
 from .negotiation import NegotiationResult, Orchestrator
+
+
+OPENING_BALANCE = 30000.0   # synthetic float, so the demo can actually settle
 
 
 def signature(req: EscalationRequest) -> str:
@@ -79,6 +82,13 @@ class ThreadSession:
         self.router = router
         self.engine = engine or AuthorisationEngine()
 
+        # Each thread carries its own wallets. Real deployments would hold one
+        # balance per principal across every thread; per-thread keeps the demo
+        # legible and is called out as a simplification rather than hidden.
+        self.wallets = Wallets()
+        self.wallets.fund(buyer_mandate.principal, OPENING_BALANCE)
+        self.settled: Optional[dict] = None
+
         self.approvals: dict[str, Approval] = {}
         self.decisions_log: list[dict] = []
         self.ledger = Ledger()
@@ -95,6 +105,10 @@ class ThreadSession:
         self.replays += 1
         self.ledger = Ledger()
         self.pending = None
+        # Replay reconstructs the negotiation only. Money already moved is not
+        # re-derived from rules, so a settled thread is never replayed.
+        if self.settled is not None:
+            raise SettlementError("a settled deal cannot be renegotiated")
 
         buyer = Agent("agt_buyer", self.buyer_mandate,
                       self.tenants[self.buyer_mandate.tenant_id], self.router, self.engine)
@@ -134,6 +148,28 @@ class ThreadSession:
         return self.advance()
 
     # ----------------------------------------------------------------------
+
+    def settle(self) -> dict:
+        """
+        Move the money against a commitment that already exists.
+
+        Settlement is not a separate act of trust: it can only run against a
+        commitment whose authority chain is already recorded, so paying is
+        downstream of being allowed to promise.
+        """
+        if self.commitment is None:
+            raise SettlementError("there is no agreed deal on this thread to settle")
+        if self.settled is not None:
+            raise SettlementError("this deal has already been settled")
+
+        before = {
+            self.commitment.buyer_principal: self.wallets.balance(self.commitment.buyer_principal),
+            self.commitment.seller_principal: self.wallets.balance(self.commitment.seller_principal),
+        }
+        payload = self.wallets.settle(self.commitment, self.ledger)
+        after = {k: self.wallets.balance(k) for k in before}
+        self.settled = {**payload, "before": before, "after": after}
+        return self.settled
 
     def mandate_for(self, principal: str) -> Mandate:
         return (self.buyer_mandate if self.buyer_mandate.principal == principal
@@ -199,6 +235,12 @@ class ThreadSession:
             "pending": pending,
             "decisions": self.decisions_log,
             "commitment": self.commitment.model_dump(mode="json") if self.commitment else None,
+            "settlement": self.settled,
+            "wallets": {
+                "currency": self.buyer_mandate.currency,
+                "balances": dict(self.wallets.balances),
+                "opening_balance": OPENING_BALANCE,
+            },
         }
 
     def _scopes_for(self, req: EscalationRequest) -> list[dict]:

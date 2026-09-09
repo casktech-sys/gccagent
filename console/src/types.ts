@@ -27,6 +27,7 @@ export interface Mandate {
   subject: string;
   unit: string;
   opening_quantity: number;
+  status: "draft" | "published" | "suspended";
   list_price: number | null;
   currency: string;
   clauses: Clause[];
@@ -110,6 +111,36 @@ export interface ThreadState {
     granted: boolean; breaches: string[]; at: string;
   }[];
   commitment: Commitment | null;
+  settlement: Settlement | null;
+  wallets: { currency: string; balances: Record<string, number>; opening_balance: number };
+}
+
+export interface Settlement {
+  commitment_id: string;
+  amount: number;
+  currency: string;
+  legs: { debit: string; credit: string; amount: number }[];
+  preconditions_met: string[];
+  before: Record<string, number>;
+  after: Record<string, number>;
+}
+
+export interface Provider {
+  name: string;
+  tier: "frontier" | "cost_efficient" | "local";
+  model: string;
+  regions: string[];
+  available: boolean;
+  live_here: boolean;
+}
+
+export interface RoutingRow {
+  tenant: string;
+  jurisdiction: string;
+  task_class: string;
+  routed_to: string | null;
+  tier: string | null;
+  refused: string | null;
 }
 
 export interface ThreadSummary {

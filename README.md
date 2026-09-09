@@ -19,6 +19,7 @@ cd console && npm install && npm run dev # terminal two, then open :5173
 ```
 
 Detailed walkthrough: [`RUNBOOK.md`](RUNBOOK.md)
+Non-technical overview, written for a business reader: [`OVERVIEW.md`](OVERVIEW.md)
 
 ---
 
@@ -43,9 +44,10 @@ Two consequences:
 - **Escalation** — scoped, single-use approvals (`full` / `price_only` / `terms_only`) that do not widen the mandate for future turns
 - **Mechanical repair** — the agent fixes what it can inside its own mandate before troubling a human
 - **Commitment ledger** — hash-chained, append-only, replayable, tamper-evident
-- **Settlement** — double-entry token wallets against a recorded commitment
-- **Multi-provider routing** — frontier / cost-efficient / offline mock, selected by task sensitivity and tenant jurisdiction
-- **Residency** — refuses rather than silently downgrading when no provider satisfies a tenant's regime
+- **Agent lifecycle** — draft, published, suspended; an unpublished agent cannot be put into a negotiation
+- **Multi-provider routing** — frontier, two cost-efficient vendors, and an in-region model, selected by task sensitivity and tenant jurisdiction
+- **Residency** — permissive tenants get the frontier model, a Saudi tenant is confined to the in-region one, and a tenant whose regulator permits no served region is refused outright rather than quietly downgraded
+- **Token settlement** — double-entry, buyer → escrow → seller, executed only against a commitment whose authority chain is already recorded
 - **Guided walkthrough** — five steps from the briefing to the authority chain, anchored to the control in question; it follows the visitor rather than leading them, and handles the refusal branch instead of breaking on it
 - **Console** — written for the person who has to decide, not the person who built it. Plain sentences, no identifiers, no protocol vocabulary; a single switch reveals clause IDs, authority chains and hashes for anyone who wants them
 
@@ -83,7 +85,7 @@ Two escalations, one partial approval that stayed partial, one mechanical repair
 ```
 console/src/        React 18 · Vite · TypeScript · Tailwind · TanStack Query
   components/       limit gauge, negotiation trace, escalation decision
-  routes/           deals, rules, record, safety
+  routes/           deals, rules, models, record, safety
   detail.tsx        plain by default, engineering depth on demand
   tour.tsx          walkthrough whose step is derived from state, not counted
 src/warrant/
@@ -99,7 +101,7 @@ src/warrant/
   api.py          FastAPI surface
   serve.py        production composite: API under /api, console at /
 docs/             master brief, architecture plan + ADRs, decisions log, block plan
-tests/            60 backend tests, fully offline and deterministic
+tests/            77 backend tests, fully offline and deterministic
                   plus 29 console tests under console/src/test
 ```
 

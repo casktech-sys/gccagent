@@ -30,6 +30,9 @@ class ProviderSpec:
     tier: Literal["frontier", "cost_efficient", "local"]
     regions: list[str] = field(default_factory=list)
     model: str = ""
+    # Configured is not the same as usable. A provider with no credential is
+    # still part of the routing policy — it just cannot be called.
+    available: bool = True
 
 
 class Provider(Protocol):
@@ -42,11 +45,17 @@ class Provider(Protocol):
 
 class MockProvider:
     """
-    Deterministic stand-in. Produces narrative prose only — it never produces
-    the structured offer, which is computed by agent policy. That separation is
-    the point: model output is decorative, not decisive.
+    Deterministic stand-in for an in-region self-hosted model.
+
+    It produces narrative prose only, never the structured offer, which is
+    computed by agent policy. That separation is the point: model output is
+    decorative, not decisive — which is also why a stub is a perfectly adequate
+    substitute for a real model in the demo.
+
+    Pinned to me-central because that is the architectural role it plays: the
+    option that remains when a tenant may not send data out of the region.
     """
-    spec = ProviderSpec("mock", "local", ["me-central", "eu-west", "us-east"], "mock-1")
+    spec = ProviderSpec("local-stub", "local", ["me-central"], "deterministic-stub")
 
     def draft(self, system: str, user: str) -> str:
         role = "seller" if "seller" in system.lower() else "buyer"
@@ -67,6 +76,9 @@ class AnthropicProvider:
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
+        self.spec = ProviderSpec(
+            "anthropic", "frontier", ["us-east", "eu-west"], "claude-sonnet-4-6",
+            available=bool(self.api_key))
 
     def draft(self, system: str, user: str) -> str:
         import urllib.request, json
@@ -94,9 +106,11 @@ class OpenAICompatProvider:
     def __init__(self, name: str, base_url: str, model: str,
                  tier: str = "cost_efficient", regions: Optional[list[str]] = None,
                  api_key_env: str = "OPENAI_API_KEY"):
-        self.spec = ProviderSpec(name, tier, regions or ["us-east"], model)  # type: ignore[arg-type]
         self.base_url = base_url.rstrip("/")
         self.api_key = os.getenv(api_key_env)
+        self.spec = ProviderSpec(
+            name, tier, regions or ["us-east"], model,  # type: ignore[arg-type]
+            available=bool(self.api_key))
 
     def draft(self, system: str, user: str) -> str:
         import urllib.request, json
@@ -131,15 +145,22 @@ class Router:
       3. everything else prefers cost_efficient
     """
 
-    def __init__(self, providers: list[Provider]):
+    def __init__(self, providers: list[Provider], require_available: bool = True):
         self.providers = providers
+        # The live router only picks providers it can actually call. A policy
+        # router ignores availability, so the placement rules can be shown and
+        # tested without credentials for every vendor.
+        self.require_available = require_available
         self.decisions: list[dict] = []
 
     def select(self, task_class: str, tenant) -> Provider:
+        candidates = [p for p in self.providers
+                      if p.spec.available or not self.require_available]
+
         if tenant.allow_cross_border_inference:
-            pool = list(self.providers)
+            pool = list(candidates)
         else:
-            pool = [p for p in self.providers
+            pool = [p for p in candidates
                     if set(p.spec.regions) & set(tenant.allowed_inference_regions)]
 
         if not pool:
@@ -163,12 +184,39 @@ class Router:
         return chosen
 
 
-def default_router(offline: bool = True) -> Router:
-    if offline:
-        return Router([MockProvider()])
-    return Router([
+def configured_providers() -> list[Provider]:
+    """
+    Every provider the platform is wired for, credential or not.
+
+    The frontier and cost-efficient vendors are region-limited on purpose: it is
+    what makes a Saudi tenant that forbids cross-border inference genuinely
+    unroutable, rather than a rule that never fires.
+    """
+    return [
         MockProvider(),
         AnthropicProvider(),
         OpenAICompatProvider("deepseek", "https://api.deepseek.com/v1",
-                             "deepseek-chat", api_key_env="DEEPSEEK_API_KEY"),
-    ])
+                             "deepseek-chat", regions=["us-east"],
+                             api_key_env="DEEPSEEK_API_KEY"),
+        OpenAICompatProvider("qwen", "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                             "qwen-plus", regions=["ap-southeast"],
+                             api_key_env="DASHSCOPE_API_KEY"),
+    ]
+
+
+def default_router(offline: bool = True) -> Router:
+    """The live router: only providers that can actually be called."""
+    if offline:
+        return Router([MockProvider()])
+    return Router(configured_providers())
+
+
+def policy_router() -> Router:
+    """
+    Routing policy over the full configured roster, ignoring credentials.
+
+    This is what the console shows. It is the honest thing to display: the
+    placement rules are real and testable whether or not this deployment
+    happens to hold a key for every vendor.
+    """
+    return Router(configured_providers(), require_available=False)
