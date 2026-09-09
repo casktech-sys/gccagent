@@ -1,0 +1,2 @@
+"""Warrant — delegated-authority agent platform (working name)."""
+__version__ = "0.1.0"

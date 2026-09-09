@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { color-scheme: light; }
+  body {
+    @apply bg-ground text-ink font-sans text-base antialiased;
+  }
+  h1, h2, h3 { @apply font-display font-normal; }
+  /* Money and quantities align in columns; this is data, not decoration. */
+  .figure { font-variant-numeric: tabular-nums; }
+  :focus-visible { @apply outline-none ring-2 ring-brass ring-offset-2 ring-offset-ground; }
+}
+
+@layer components {
+  .panel { @apply bg-surface border border-rule; }
+  .btn {
+    @apply px-3 py-1.5 text-small font-medium border transition-colors
+           disabled:opacity-40 disabled:cursor-not-allowed rounded-sm;
+  }
+  .btn-authority { @apply btn border-brass/60 text-brass hover:bg-brass hover:text-surface; }
+  .btn-quiet { @apply btn border-rule text-muted hover:text-ink hover:border-muted; }
+  .btn-decline { @apply btn border-rust/50 text-rust hover:bg-rust hover:text-surface; }
+  /* Serif italic, the way a printed page numbers its own sections. */
+  .step-mark { @apply font-display italic text-muted; }
+}
+
+/* The single orchestrated motion: rows the last decision produced. */
+@keyframes settle { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+.settle { animation: settle 260ms ease-out both; }
+
+/* Draws the eye to whatever the walkthrough points at, once, then stops.
+   Continuous pulsing becomes wallpaper within seconds. */
+@keyframes attend {
+  0%   { box-shadow: 0 0 0 3px rgb(138 106 18 / 0);   }
+  45%  { box-shadow: 0 0 0 5px rgb(138 106 18 / 0.35); }
+  100% { box-shadow: 0 0 0 3px rgb(138 106 18 / 0.22); }
+}
+.attend { animation: attend 800ms ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .settle, .attend { animation: none; }
+  * { transition-duration: 0ms !important; }
+}

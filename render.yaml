@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: warrant-demo
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    envVars:
+      # The console runs on the deterministic offline provider. No API key is
+      # needed and no text leaves the container.
+      - key: WARRANT_ONLINE
+        value: "0"
+      - key: WARRANT_MAX_SESSIONS
+        value: "50"
